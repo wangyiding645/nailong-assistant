@@ -18,6 +18,16 @@
 
 ---
 
+## 下载 Windows 最新版
+
+**3.2.0 修订版 · 2026-10-10 · Windows x64**
+
+- [安装版](https://github.com/kami0410/nailong-assistant/releases/download/v3.2.0-20261010/nailong-assistant-3.2.0-win-x64.exe)：安装向导。
+- [免安装版](https://github.com/kami0410/nailong-assistant/releases/download/v3.2.0-20261010/nailong-assistant-3.2.0-win-x64-portable.exe)：放到可写目录后直接运行，无需另装 Node.js 或 pi。
+- [发布说明与校验文件](https://github.com/kami0410/nailong-assistant/releases/tag/v3.2.0-20261010)。
+
+本次安装包托管在贡献者 fork 的 Release，代码已合入本仓库。升级前退出旧版，并保留原程序旁的 `agent.json`、`settings.json`、`.userdata` 等个人数据；使用同一个 Windows 账户读取加密密钥。
+
 ## 🤖 双内核：pi 当大脑
 
 奶蛙有 **54 个工具**，但"怎么想"这件事不必自己造：
