@@ -12,7 +12,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D4?logo=windows&logoColor=white)](#)
 [![Electron](https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white)](#)
 [![License](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/kami0410/nailong-assistant?color=orange)](https://github.com/kami0410/nailong-assistant/releases/tag/v3.2.0-20261010)
+[![Release](https://img.shields.io/github/v/release/wangyiding645/nailong-assistant?color=orange)](https://github.com/wangyiding645/nailong-assistant/releases/tag/v3.2.0-20261010)
 [![Stars](https://img.shields.io/github/stars/wangyiding645/nailong-assistant?style=social)](https://github.com/wangyiding645/nailong-assistant/stargazers)
 
 [简体中文](README.md) · [English](README_EN.md)
@@ -25,11 +25,11 @@
 
 **3.2.0 revision · 2026-10-10 · Windows x64**
 
-- [Installer](https://github.com/kami0410/nailong-assistant/releases/download/v3.2.0-20261010/nailong-assistant-3.2.0-win-x64.exe).
-- [Portable](https://github.com/kami0410/nailong-assistant/releases/download/v3.2.0-20261010/nailong-assistant-3.2.0-win-x64-portable.exe): run from a writable directory; no separate Node.js or pi installation is needed.
-- [Release notes and SHA-256 checksums](https://github.com/kami0410/nailong-assistant/releases/tag/v3.2.0-20261010).
+- [Installer](https://github.com/wangyiding645/nailong-assistant/releases/download/v3.2.0-20261010/nailong-assistant-3.2.0-win-x64.exe).
+- [Portable](https://github.com/wangyiding645/nailong-assistant/releases/download/v3.2.0-20261010/nailong-assistant-3.2.0-win-x64-portable.exe): run from a writable directory; no separate Node.js or pi installation is needed.
+- [Release notes and SHA-256 checksums](https://github.com/wangyiding645/nailong-assistant/releases/tag/v3.2.0-20261010).
 
-These binaries are hosted in the contributor's fork; the corresponding source has been merged into this repository. Exit the old app before upgrading and preserve `agent.json`, `settings.json`, `.userdata` and other personal data beside it. Use the same Windows account to read encrypted credentials.
+These binaries are published in this repository's Release. Exit the old app before upgrading and preserve `agent.json`, `settings.json`, `.userdata` and other personal data beside it. Use the same Windows account to read encrypted credentials.
 
 ## 🆕 v3.2 — bundled pi kernel, fully wired
 

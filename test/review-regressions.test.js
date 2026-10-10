@@ -154,7 +154,9 @@ test('review: PowerShell working directory is literal even with dollar expressio
   const host = createHost({ paths: { ROOT: base, code: base }, log: quiet, native: {}, services: {} });
   const r = await host.runCommand('(Get-Location).Path', dir, 10000);
   assert.equal(r.code, 0);
-  assert.equal(r.stdout.trim(), dir);
+  // Windows runner 的 TEMP 可能使用 RUNNER~1 短路径；PowerShell 会返回对应长路径。
+  // 比较实际目录仍可捕获引号/表达式注入、错误工作区和额外输出。
+  assert.equal(fs.realpathSync.native(r.stdout.trim()), fs.realpathSync.native(dir));
 });
 test('review: guard blocks code directory and junction aliases for protected directories', t => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'nailong-review-'));
