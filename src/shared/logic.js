@@ -125,8 +125,29 @@
       .slice(0, max || 5);
   }
 
+  // 桌宠体型：scale 是相对基准窗口的倍率（1 = 100%）。吃一份文件 +0.1，不设上限，
+  // 只在物理上封顶（见 windows.js：屏幕装不下就按屏幕来，保证奶娃本体可见）。
+  var PET_SCALE_MIN = 0.5;
+  var PET_SCALE_MAX = 9.99;
+  var PET_BITE = 0.1;
+  function clampPetScale(v) {
+    var n = Number(v);
+    if (!isFinite(n) || n <= 0) { n = 1; }
+    n = Math.round(n * 100) / 100;   // 存两位小数，免得 settings.json 里出现 1.4000000000000001
+    return Math.min(PET_SCALE_MAX, Math.max(PET_SCALE_MIN, n));
+  }
+  function growPetScale(v, bites) {
+    var n = Math.max(1, Math.round(Number(bites) || 1));
+    return clampPetScale(clampPetScale(v) + PET_BITE * n);
+  }
+
   return {
     CN_WEEK: CN_WEEK,
+    PET_SCALE_MIN: PET_SCALE_MIN,
+    PET_SCALE_MAX: PET_SCALE_MAX,
+    PET_BITE: PET_BITE,
+    clampPetScale: clampPetScale,
+    growPetScale: growPetScale,
     CN_DOW: CN_DOW,
     pad2: pad2,
     trim: trim,

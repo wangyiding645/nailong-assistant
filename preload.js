@@ -176,6 +176,7 @@ contextBridge.exposeInMainWorld('widget', {
   petEvent: invoke('pet-event'),
   petMove: invoke('pet-move'),
   petMoveBy: invoke('pet-move-by'),
+  petGrow: invoke('pet-grow'),
   recyclePaths: invoke('recycle-paths'),
   dropSubmit: invoke('drop-submit'),
   askDone: invoke('ask-done-event'),

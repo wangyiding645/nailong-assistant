@@ -103,11 +103,12 @@ function currentAnim() {
   if (state.reminder || state.celebrate) return 'jumping';
   if (state.mode === 'coin' && Date.now() < state.coinSpin) return 'jumping';
   if (state.ping && state.ping.anim && Date.now() < state.ping.until) return state.ping.anim;
+  // 闹钟响着就必须跳：这条要在形态判断前面，否则开助手时闹钟只是在响、角色没反应
+  if (state.alarm && state.alarm.ringing) return 'jumping';
   if (state.mode === 'assistant' && Date.now() < state.actionLaugh) return 'jumping';
   if (state.mode === 'assistant') return 'work';
   if (state.mode === 'focus' && state.focus && state.focus.phase === 'short') return 'jumping';
   if (state.mode === 'focus' && state.focus && state.focus.phase === 'focus') return 'work';
-  if (state.alarm && state.alarm.ringing) return 'jumping';
   if (state.cd) return 'waiting';
   if (state.pre) return 'waving';
   if (state.dragging) return state.dragDir;
@@ -193,7 +194,7 @@ async function confirmRecycle() {
   const ok = (res && res.ok) || 0;
   const fail = (res && typeof res.fail === 'number') ? res.fail : (ask.paths.length - ok);
   state.ask = null;
-  if (ok > 0) { spinPet(1100); playHappy(0.95); }
+  if (ok > 0) { spinPet(1100); playHappy(0.95); api.petGrow().catch(() => {}); }
   if (ok > 0 && fail === 0) state.ping = { text: '🗑️ ' + I.t('pet.recycleOk', { n: ok }), anim: 'jumping', until: Date.now() + 8000 };
   else if (ok > 0) state.ping = { text: '🗑️ ' + I.t('pet.recyclePart', { n: ok, fail: fail }), anim: 'jumping', until: Date.now() + 8000 };
   else state.ping = { text: '⚠ ' + I.t('pet.recycleFail') + (res && res.err ? '：' + res.err : ''), until: Date.now() + 8000 };
@@ -234,6 +235,19 @@ function dismissAlarm() {
     api.petEvent({ type: 'alarm-stopped' });
     renderBubble(); renderChip();
   }
+}
+
+// 闹钟响着、或倒计时已到点：不管此刻是什么形态，点一下就该停
+function dismissPending() {
+  if (state.alarm && state.alarm.ringing) { dismissAlarm(); return true; }
+  if (state.cd && state.cd.done) { dismissCountdown(); return true; }
+  return false;
+}
+
+// 体型：整个界面按倍率整体缩放（窗口大小由主进程按同样的倍率同步）
+function applyPetZoom(scale) {
+  const sc = Math.max(0.1, Math.min(10, Number(scale) || 1));
+  document.body.style.zoom = String(sc);
 }
 
 function refreshToday() {
@@ -296,10 +310,12 @@ function renderBubble() {
   } else if (state.pre) {
     key = 'p:' + state.pre.key;
     html = '<div class="bi"><span class="x">5 分钟后：' + L.esc(state.pre.text) + '</span></div>';
-  } else if (state.mode === 'countdown' && state.cd) {
-    key = 'cdn:' + Math.ceil(Math.max(0, state.cd.endAt - Date.now()) / 1000);
-    html = '<div class="bi now"><span class="t">⏳</span><span class="x">' + fmtMs(state.cd.endAt - Date.now()) + '</span></div>';
-  } else if (state.mode === 'alarm' && state.alarm) {
+  } else if (state.cd && (state.cd.done || state.mode === 'countdown')) {
+    const left = state.cd.endAt - Date.now();
+    key = 'cdn:' + (state.cd.done ? 'done' : Math.ceil(Math.max(0, left) / 1000));
+    html = '<div class="bi now"><span class="t">⏳</span><span class="x">'
+      + (state.cd.done ? I.t('pet.timeUp') : fmtMs(left)) + '</span></div>';
+  } else if (state.alarm && (state.alarm.ringing || state.mode === 'alarm')) {
     key = 'alm:' + state.alarm.hm + (state.alarm.ringing ? ':on' : '');
     flash = !!state.alarm.ringing;
     html = '<div class="bi"><span class="t">⏰</span><span class="x">'
@@ -358,11 +374,11 @@ function renderChip() {
     txt = (state.focus.phase === 'focus' ? '🍅 ' : '☕ ') + fmtMs(state.focus.remainMs)
       + (state.focus.todayCount ? ' · 今日 ' + state.focus.todayCount : '');
     if (state.focus.phase === 'focus' && left <= 0) hot = true;
-  } else if (state.mode === 'countdown' && state.cd) {
+  } else if (state.cd) {
     const left = state.cd.endAt - Date.now();
     txt = '⏳ ' + fmtMs(left);
     if (left <= 0) hot = true;
-  } else if (state.mode === 'alarm' && state.alarm) {
+  } else if (state.alarm) {
     txt = '⏰ ' + state.alarm.hm + (state.alarm.ringing ? ' !' : '');
     hot = !!state.alarm.ringing;
   } else if (state.mode === 'coin') {
@@ -490,6 +506,7 @@ $('pet').addEventListener('pointerup', (e) => {
   try { $('pet').releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
   if (!drag.moved) {
     if (state.ask) return;
+    if (dismissPending()) return;
     if (state.mode === 'coin') doCoinFlip();
     else if (state.mode === 'countdown') dismissCountdown();
     else if (state.mode === 'alarm') dismissAlarm();
@@ -525,6 +542,7 @@ $('bubble').addEventListener('click', async (e) => {
     }
   }
   if (state.ask) return;
+  if (dismissPending()) return;
   if (state.mode === 'coin') { doCoinFlip(); return; }
   if (state.mode === 'countdown') { dismissCountdown(); return; }
   if (state.mode === 'alarm') { dismissAlarm(); return; }
@@ -569,6 +587,7 @@ setInterval(tick, 1000);
   const forced = qs.get('anim');
   const data = await api.petInit();
   if (window.WidgetI18n) window.WidgetI18n.setLocale(data.locale);
+  applyPetZoom(data.petScale);
   state.settings = (data.state && data.state.settings) || { sound: true };
   if (data.settings && typeof data.settings.sound === 'boolean') state.settings.sound = data.settings.sound;
   if (A) { A.setEnabled(audioEnabled()); A.play('startup', 0.7); }
@@ -622,9 +641,9 @@ setInterval(tick, 1000);
     renderChip();
   });
   api.onModeChanged((m) => {
+    // 闹钟/倒计时不跟随形态：切形态（开助手、点通知、快捷键）只是换个界面，
+    // 不该把它们悄悄清掉 —— 否则到点既不响也不笑。只有用户主动取消才消失。
     const nm = m || 'normal';
-    if (nm !== 'countdown' && state.cd) state.cd = null;
-    if (nm !== 'alarm' && state.alarm) { alarmRingStop(); state.alarm = null; }
     state.mode = nm;
     state.assistantOpen = (nm === 'assistant');
     $('ring').className = state.assistantOpen ? 'on' : '';
@@ -696,6 +715,7 @@ setInterval(tick, 1000);
       renderBubble(); renderChip();
       return;
     }
+    if (act === 'scale') { applyPetZoom(p.scale); return; }
     if (act === 'countdown-start') { state.cd = { endAt: Number(p.endAt) || 0, done: false }; state.ping = null; bounce(); }
     else if (act === 'countdown-cancel') { state.cd = null; state.ping = null; }
     else if (act === 'alarm-set') { alarmRingStop(); state.alarm = { hm: String(p.hm || ''), ringing: false, fired: false }; state.ping = null; bounce(); }

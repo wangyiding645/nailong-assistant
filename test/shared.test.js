@@ -27,6 +27,18 @@ test('logic: 日期与时间基础', () => {
   assert.equal(L.humanDuration(3725), '1 小时 2 分');
 });
 
+test('logic: 桌宠体型规则（吃文件 +10%，中间不封顶）', () => {
+  assert.equal(L.clampPetScale(undefined), 1, '没配过就是 100%');
+  assert.equal(L.clampPetScale(0), 1, '无效倍率（0/负数/非数字）当没配过');
+  assert.equal(L.clampPetScale('abc'), 1);
+  assert.equal(L.clampPetScale(0.3), 0.5, '下限 50%');
+  assert.equal(L.clampPetScale(1e9), 9.99, '只在 999% 封顶');
+  assert.equal(L.growPetScale(1, 1), 1.1, '吃一份 +10%');
+  assert.equal(L.growPetScale(1.1, 3), 1.4, '多份按份数累加');
+  assert.equal(L.growPetScale(3, 1), 3.1, '中间不设上限');
+  assert.equal(L.growPetScale(9.9, 5), 9.99);
+});
+
 test('logic: 倒数日解析与排序', () => {
   const list = L.parseCountdown('# 注释\n2026-12-25|圣诞节\r\n2026-01-01|元旦\r\nbadline');
   assert.equal(list.length, 2);

@@ -21,7 +21,7 @@ class Window extends EventEmitter {
 }
 const originalLoad = Module._load;
 Module._load = function (name, ...args) {
-  if (name === 'electron') return { BrowserWindow: Window, screen: { getPrimaryDisplay: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) } };
+  if (name === 'electron') return { BrowserWindow: Window, screen: { getPrimaryDisplay: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }), getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) } };
   return originalLoad.call(this, name, ...args);
 };
 const { createWindows } = require('../src/main/windows');

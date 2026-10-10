@@ -32,6 +32,7 @@ function registerIpc(ctx) {
     countdown: services.countdown.readText(),
     state: services.stateObj(),
     settings: services.settings.get(),
+    petScale: windows.petScale(),
     theme: services.settings.getKey('theme', 0),
     locale: services.settings.getKey('locale', 'zh-CN'),
     mode: appState.mode,
@@ -92,6 +93,8 @@ function registerIpc(ctx) {
       if (pol.maxSteps !== undefined && (!Number.isInteger(Number(pol.maxSteps)) || pol.maxSteps < 3 || pol.maxSteps > 80)) throw new Error('任务步数必须为 3–80');
       if (a.contextWindow !== undefined && (!Number.isInteger(Number(a.contextWindow)) || a.contextWindow < 1024 || a.contextWindow > 2000000)) throw new Error('上下文窗口必须为 1024–2000000');
     }
+    const pet = patch && patch.pet;
+    if (pet && pet.scale !== undefined) pet.scale = L.clampPetScale(pet.scale);
     services.settings.set(patch || {});
     if (services.settings.store.saveNow() === false) { services.settings.set(before); throw new Error('设置写入失败，本次未保存'); }
     const after = services.settings.get();
@@ -104,6 +107,10 @@ function registerIpc(ctx) {
       if (agentSvc.restartPiIfNeeded && agentSvc.restartPiIfNeeded()) {
         agentSvc.restartPi().catch((e) => log.warn('[pi] 重启失败：' + e.message));
       }
+    }
+    if (JSON.stringify(before.pet) !== JSON.stringify(after.pet)) {
+      windows.applyPetScale();
+      windows.send('pet', 'pet-ping', { action: 'scale', scale: windows.petScale() });
     }
     windows.broadcast('settings-changed', after);
     return after;
@@ -497,16 +504,24 @@ function registerIpc(ctx) {
     }
     return true;
   });
+  // 吃文件长大：一份食物 +10%（规模与上限见 shared/logic.js，屏幕上装不下时由 windows 层封顶）
+  h('pet-grow', () => {
+    const pet = Object.assign({}, services.settings.getKey('pet', {}));
+    pet.scale = L.growPetScale(pet.scale, 1);
+    applySettings({ pet: pet });
+    return pet.scale;
+  });
   h('pet-move', (p) => {
     const w = windows.get('pet');
-    if (w && p) w.setBounds({ x: Math.round(p.x), y: Math.round(p.y), width: windows.SIZES.pet.w, height: windows.SIZES.pet.h });
+    if (w && p) { const s = windows.petSize(); w.setBounds({ x: Math.round(p.x), y: Math.round(p.y), width: s.w, height: s.h }); }
     return true;
   });
   h('pet-move-by', (p) => {
     const w = windows.get('pet');
     if (w && p) {
       const b = w.getBounds();
-      w.setBounds({ x: b.x + Math.round(p.dx || 0), y: b.y + Math.round(p.dy || 0), width: windows.SIZES.pet.w, height: windows.SIZES.pet.h });
+      const s = windows.petSize();
+      w.setBounds({ x: b.x + Math.round(p.dx || 0), y: b.y + Math.round(p.dy || 0), width: s.w, height: s.h });
     }
     return true;
   });

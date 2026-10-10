@@ -492,6 +492,14 @@ async function initPerm(isFirst) {
 }
 
 // ---------------------------------------------------------------- 外观
+function syncPetScale() {
+  const el = $('petScale');
+  if (!el || !SET) return;
+  const pct = Math.round((Number((SET.pet || {}).scale) || 1) * 100);
+  el.value = String(Math.max(50, Math.min(999, pct)));
+  $('petScaleVal').textContent = pct + '%';
+}
+
 async function initLook() {
   const s = SET;
   $('theme').value = String(s.theme || 0);
@@ -512,6 +520,21 @@ async function initLook() {
     }
   });
   sw('sw-autostart', !!s.autoStart, async (v) => { await saveSettings({ autoStart: v }, true); toast(v ? '开机自启已开启' : '开机自启已关闭'); });
+
+  syncPetScale();
+  let petTimer = null;
+  $('petScale').oninput = () => {
+    const pct = parseInt($('petScale').value, 10) || 100;
+    $('petScaleVal').textContent = pct + '%';
+    clearTimeout(petTimer);
+    // 拖的时候别每像素都写盘；停手 250ms 再存，但界面上的百分比是即时的
+    petTimer = setTimeout(() => { saveSettings({ pet: Object.assign({}, SET.pet, { scale: pct / 100 }) }, true).then(syncPetScale); }, 250);
+  };
+  $('petScaleReset').onclick = async () => {
+    await saveSettings({ pet: Object.assign({}, SET.pet, { scale: 1 }) }, true);
+    syncPetScale();
+    toast('体型已回到 100%');
+  };
 
   const hk = s.hotkeys || {};
   $('hk-assistant').value = hk.assistant || '';
@@ -773,7 +796,7 @@ async function renderOnboard() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') $('close').click();
   });
-  api.onSettingsChanged((s) => { if (s) { SET = s; if (window.WidgetAudio) window.WidgetAudio.setEnabled(s.sound !== false); } });
+  api.onSettingsChanged((s) => { if (s) { SET = s; if (window.WidgetAudio) window.WidgetAudio.setEnabled(s.sound !== false); syncPetScale(); } });
 
   // 首次运行：给个提示，但不拦截
   const cfg = await api.agentCfgGet();

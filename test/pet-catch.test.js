@@ -9,12 +9,17 @@ Module._load = function (name, ...args) {
 };
 const { createPetActions } = require('../src/main/pet-actions');
 Module._load = originalLoad;
-function fixture(t) {
+function fixture(t, scale = 1) {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: 1000 });
-  let bounds = { x: 450, y: 360, width: 190, height: 230 };
+  let bounds = { x: 450, y: 360, width: 190 * scale, height: 230 * scale };
   const messages = [], endings = [];
   const win = { getBounds: () => ({ ...bounds }), setBounds: b => { bounds = { ...b }; } };
-  const game = createPetActions({ windows: { SIZES: { pet: { w: 190, h: 230 } }, get: () => win, send: (kind, channel, value) => messages.push(value) }, native: {}, log: {}, onCatchEnd: result => endings.push(result) });
+  const game = createPetActions({ windows: {
+    petSize: () => ({ w: Math.round(190 * scale), h: Math.round(230 * scale) }),
+    petScale: () => scale,
+    get: () => win,
+    send: (kind, channel, value) => messages.push(value)
+  }, native: {}, log: {}, onCatchEnd: result => endings.push(result) });
   return { game, messages, endings, win };
 }
 test('catch success emits one finish and leaves the running state', t => {
@@ -49,4 +54,18 @@ test('restarting a round does not report it as a timeout or win', t => {
   assert.equal(endings.length, 1);
   assert.equal(endings[0].reason, 'restart');
   game.stop(false);
+});
+test('长大后的奶蛙带着更大窗口和小游戏边界跑', t => {
+  const { game, win } = fixture(t, 2);
+  win.setBounds({ x: 450, y: 100, width: 380, height: 460 });
+  game.start();
+  t.mock.timers.tick(5000);
+  const b = win.getBounds();
+  assert.equal(b.width, 380, '窗口宽度跟着体型');
+  assert.equal(b.height, 460, '窗口高度跟着体型');
+  // 角色本体（窗口内 47/126 处，96×104）始终留在工作区里，偏移量要跟着体型一起放大
+  const left = b.x + 47 * 2, top = b.y + 126 * 2;
+  assert.ok(left >= 0 && top >= 0, '本体不能跑出左上角：' + left + ',' + top);
+  assert.ok(left + 96 * 2 <= 1280 && top + 104 * 2 <= 720, '本体不能跑出右下角：' + left + ',' + top);
+  game.stop(true);
 });

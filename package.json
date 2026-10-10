@@ -1,7 +1,7 @@
 {
   "name": "nailong-assistant",
   "productName": "奶蛙助手",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "private": true,
   "description": "一只住在 Windows 桌面上的奶蛙：pi 内核驱动的 AI 电脑助手（会看屏幕、会用鼠标键盘、会读无障碍元素树）+ 日程提醒 + 番茄专注 + 数据统计 + 剪贴板历史 + 桌宠小游戏",
   "main": "main.js",

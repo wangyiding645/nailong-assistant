@@ -58,6 +58,9 @@
   .kv .k { width: 130px; color: var(--fg-dim); flex: none; }
   .kv .v { font-family: var(--mono); font-size: 11.5px; }
   .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; background: var(--chip); border: 1px solid var(--chip-br); font-size: 11px; font-family: var(--mono); }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; }
+  input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: var(--chip); box-shadow: inset 0 0 0 1px var(--chip-br); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -5px; border-radius: 50%; background: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.4); cursor: pointer; }
 </style>
 </head>
 <body class="t0">
@@ -302,6 +305,12 @@
                 <option value="en">English（AI 回复语言）</option>
               </select>
             </div>
+            <div class="fld" style="max-width:520px">
+              <label>奶蛙体型 <span class="pill" id="petScaleVal">100%</span></label>
+              <input id="petScale" type="range" min="50" max="999" step="1" value="100">
+              <div class="desc">拖着这个小条即时改大小（50%–999%）。把文件拖到奶蛙身上、确认回收后它会吃胖一点（一份食物 +10%，不设上限）；屏幕装不下时以屏幕为准，保证奶蛙本体看得见。</div>
+            </div>
+            <div class="row" style="max-width:520px"><div class="btn sm" id="petScaleReset">重置体型</div></div>
             <div class="switch" style="max-width:520px">
               <div class="track" id="sw-sound"><i></i></div>
               <div class="txt"><span data-i18n="set.sw.sound"></span><small data-i18n="set.sw.soundHint"></small></div>

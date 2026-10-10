@@ -28,7 +28,9 @@ function createPetActions(deps) {
   let dropHome = null;
   let petWalking = false;
 
-  const petSize = () => windows.SIZES.pet;
+  const petSize = () => windows.petSize();
+  // 抓奶蛙的偏移量是按基准窗口量的（47/126 是角色左上角，+48/+52 到中心），体型放大要等比跟上
+  const petScale = () => (typeof windows.petScale === 'function' ? windows.petScale() : 1);
   const send = (p) => windows.send('pet', 'pet-ping', p || {});
 
   function setPetBounds(x, y) {
@@ -64,11 +66,12 @@ function createPetActions(deps) {
     if (returnTimer) { clearTimeout(returnTimer); returnTimer = null; }
     if (catchGame) stop(false, 'restart');
     const s = petSize();
+    const sc = petScale();
     const wa = screen.getDisplayNearestPoint({ x: b.x, y: b.y }).workArea;
     const g = {
       homeX: b.x, homeY: b.y,
-      minX: wa.x - CATCH.OX, minY: wa.y - CATCH.OY,
-      maxX: wa.x + wa.width - s.w + CATCH.OX, maxY: wa.y + wa.height - s.h,
+      minX: wa.x - CATCH.OX * sc, minY: wa.y - CATCH.OY * sc,
+      maxX: wa.x + wa.width - s.w + CATCH.OX * sc, maxY: wa.y + wa.height - s.h,
       x: b.x, y: b.y,
       vx: 0, vy: 0, dir: '', startAt: Date.now(), last: 0, timer: null, auto: null, dodges: 0
     };
@@ -111,8 +114,8 @@ function createPetActions(deps) {
       tune(g, CATCH.SPEED * (0.85 + Math.random() * 0.4));
     }
     const cp = screen.getCursorScreenPoint();
-    let dx = (g.x + CATCH.OX + 48) - cp.x;
-    let dy = (g.y + CATCH.OY + 52) - cp.y;
+    let dx = (g.x + (CATCH.OX + 48) * petScale()) - cp.x;
+    let dy = (g.y + (CATCH.OY + 52) * petScale()) - cp.y;
     let dist = Math.hypot(dx, dy);
     if (dist < CATCH.DODGE_R) {
       if (dist < 6) { dx = -g.vx; dy = -g.vy; dist = Math.hypot(dx, dy); }

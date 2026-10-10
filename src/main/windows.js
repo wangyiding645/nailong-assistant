@@ -8,6 +8,7 @@ const fs = require('fs');
 const { BrowserWindow, screen } = require('electron');
 
 const P = require('./paths.js');
+const L = require('../shared/logic.js');
 const { prepareWindowBranding } = require('./window-branding');
 
 const SIZES = {
@@ -86,13 +87,64 @@ function createWindows(deps) {
     win.loadFile(path.join(P.renderer, file), query ? { query: query } : undefined);
   }
 
+  // ---------------------------------------------------------------- 桌宠体型
+  // settings.pet.scale 存的是「想要的倍率」；实际用多少还要看屏幕装不装得下。
+  // 屏幕装不下时按屏幕封顶：窗口比屏幕还高的话奶蛙本体就掉到屏幕外了。
+  function petDisplay() {
+    const w = get('pet');
+    if (w) {
+      const b = w.getBounds();
+      return screen.getDisplayNearestPoint({ x: b.x + Math.round(b.width / 2), y: b.y + Math.round(b.height / 2) });
+    }
+    return screen.getPrimaryDisplay();
+  }
+
+  function petScale() {
+    const want = L.clampPetScale((settings && settings.getKey ? settings.getKey('pet', {}) : {}).scale);
+    const wa = petDisplay().workArea;
+    return Math.max(0.1, Math.min(want, wa.width / SIZES.pet.w, wa.height / SIZES.pet.h));
+  }
+
+  function petSize() {
+    const sc = petScale();
+    return { w: Math.round(SIZES.pet.w * sc), h: Math.round(SIZES.pet.h * sc) };
+  }
+
+  function clampPetPos(pos, size) {
+    const p = pos || defaultPetPos();
+    // 按“离它最近的那块屏”夹，否则多屏用户会被拽回主屏
+    const wa = screen.getDisplayNearestPoint({ x: Math.round(p.x), y: Math.round(p.y) }).workArea;
+    return {
+      x: Math.max(wa.x, Math.min(Math.round(p.x), wa.x + wa.width - size.w)),
+      y: Math.max(wa.y, Math.min(Math.round(p.y), wa.y + wa.height - size.h))
+    };
+  }
+
+  /** 按当前体型重排桌宠窗口：左下角锚点（脚不动，往上长），并夹回屏幕内 */
+  function applyPetScale() {
+    const w = get('pet');
+    const s = petSize();
+    if (!w) return s;
+    const b = w.getBounds();
+    const wa = screen.getDisplayNearestPoint({ x: b.x, y: b.y }).workArea;
+    const pos = {
+      x: Math.max(wa.x, Math.min(Math.round(b.x), wa.x + wa.width - s.w)),
+      y: Math.max(wa.y, Math.min(Math.round(b.y + b.height - s.h), wa.y + wa.height - s.h))
+    };
+    w.setMinimumSize(s.w, s.h);
+    w.setMaximumSize(s.w, s.h);
+    w.setBounds({ x: pos.x, y: pos.y, width: s.w, height: s.h });
+    petPos = { x: pos.x, y: pos.y };
+    return s;
+  }
+
   // ---------------------------------------------------------------- 桌宠
   function createPet() {
-    const pos = readPetPos();
-    const s = SIZES.pet;
+    const size = petSize();
+    const pos = clampPetPos(readPetPos(), size);
     wins.pet = new BrowserWindow(baseOptions('pet', {
-      x: pos.x, y: pos.y, width: s.w, height: s.h,
-      minWidth: s.w, minHeight: s.h, maxWidth: s.w, maxHeight: s.h
+      x: pos.x, y: pos.y, width: size.w, height: size.h,
+      minWidth: size.w, minHeight: size.h, maxWidth: size.w, maxHeight: size.h
     }));
     load(wins.pet, 'pet.html', debugQuery());
     forwardLogs(wins.pet, 'pet');
@@ -118,8 +170,9 @@ function createWindows(deps) {
       if (!wins.pet || wins.pet.isDestroyed()) return;
       const b = wins.pet.getBounds();
       petPos = { x: b.x, y: b.y };
-      if (b.width > s.w + 24 || b.height > s.h + 24) {
-        wins.pet.setBounds({ x: b.x, y: b.y, width: s.w, height: s.h });
+      const now = petSize();
+      if (b.width > now.w + 24 || b.height > now.h + 24) {
+        wins.pet.setBounds({ x: b.x, y: b.y, width: now.w, height: now.h });
       }
       if (moveTimers.pet) clearTimeout(moveTimers.pet);
       moveTimers.pet = setTimeout(() => { if (deps.onPetMoved) deps.onPetMoved(petPos); }, 600);
@@ -130,7 +183,8 @@ function createWindows(deps) {
 
   function defaultPetPos() {
     const wa = screen.getPrimaryDisplay().workArea;
-    return { x: wa.x + wa.width - SIZES.pet.w - 36, y: wa.y + wa.height - SIZES.pet.h - 36 };
+    const s = petSize();
+    return { x: wa.x + wa.width - s.w - 36, y: wa.y + wa.height - s.h - 36 };
   }
 
   function readPetPos() {
@@ -277,7 +331,8 @@ function createWindows(deps) {
     const w = get('pet');
     const wa = screen.getPrimaryDisplay().workArea;
     if (w) return w.getBounds();
-    return { x: wa.x + wa.width - 260, y: wa.y + wa.height - 300, width: SIZES.pet.w, height: SIZES.pet.h };
+    const s = petSize();
+    return { x: wa.x + wa.width - s.w - 60, y: wa.y + wa.height - s.h - 60, width: s.w, height: s.h };
   }
 
   function placeNearPet(w, width, height) {
@@ -344,7 +399,7 @@ function createWindows(deps) {
     wins, SIZES, TITLES, auditErrors,
     createPet, createPanel, createAssistant, createTool, createMenu, createSettings,
     get, ensure, show, hide, place, placeNearPet, placePanel, centerWindow,
-    send, broadcast, allOverlays, petBounds, writePetPos, defaultPetPos, isFullscreenAppActive, dispose
+    send, broadcast, allOverlays, petBounds, petSize, petScale, applyPetScale, writePetPos, defaultPetPos, isFullscreenAppActive, dispose
   };
 }
 
