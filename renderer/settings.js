@@ -451,7 +451,7 @@ async function initPerm(isFirst) {
   const s = SET || await api.settingsGet();
   SET = s;
   $('policyMode').value = (s.agent && s.agent.policy && s.agent.policy.mode) || 'confirm';
-  num('maxSteps', (s.agent && s.agent.policy && s.agent.policy.maxSteps) || 24);
+  num('maxSteps', (s.agent && s.agent.policy && s.agent.policy.maxSteps) || 0);
   sw('sw-high', true, async () => {});
   $('sw-high').onclick = null;
   $('sw-high').setAttribute('aria-disabled', 'true');
@@ -460,7 +460,7 @@ async function initPerm(isFirst) {
     await saveSettings({ agent: Object.assign({}, SET.agent, { policy: pol }) });
   };
   $('maxSteps').onchange = async () => {
-    const pol = Object.assign({}, SET.agent.policy, { maxSteps: intOf('maxSteps', 24) });
+    const pol = Object.assign({}, SET.agent.policy, { maxSteps: intOf('maxSteps', 0) });
     await saveSettings({ agent: Object.assign({}, SET.agent, { policy: pol }) });
   };
 

@@ -90,7 +90,7 @@ function registerIpc(ctx) {
       if (agentSvc.pi.streaming && ['piConfig', 'engine', 'workspace', 'noSkills', 'noContextFiles', 'loadUserExtensions', 'noMcp', 'contextWindow', 'disabledTools', 'skillPaths'].some(k => JSON.stringify(a[k]) !== JSON.stringify((before.agent || {})[k]))) throw new Error('请先停止当前任务再修改运行配置');
       if (a.workspace && (!path.isAbsolute(a.workspace) || !fs.statSync(a.workspace).isDirectory())) throw new Error('工作区必须是存在的绝对目录');
       const pol = a.policy || {};
-      if (pol.maxSteps !== undefined && (!Number.isInteger(Number(pol.maxSteps)) || pol.maxSteps < 3 || pol.maxSteps > 80)) throw new Error('任务步数必须为 3–80');
+      if (pol.maxSteps !== undefined && (!Number.isInteger(Number(pol.maxSteps)) || pol.maxSteps < 0 || pol.maxSteps > 100000)) throw new Error('工具调用次数上限必须为 0–100000（0 = 不限）');
       if (a.contextWindow !== undefined && (!Number.isInteger(Number(a.contextWindow)) || a.contextWindow < 1024 || a.contextWindow > 2000000)) throw new Error('上下文窗口必须为 1024–2000000');
     }
     const pet = patch && patch.pet;
@@ -123,7 +123,7 @@ function registerIpc(ctx) {
   h('settings-get', () => services.settings.get());
   h('settings-save', (patch) => applySettings(patch));
   h('settings-reset', () => {
-    services.settings.set({ agent: { disabledTools: {}, policy: { mode: 'confirm', allow: {}, deny: {}, confirmHighRisk: true, maxSteps: 24 }, locale: 'zh-CN' } });
+    services.settings.set({ agent: { disabledTools: {}, policy: { mode: 'confirm', allow: {}, deny: {}, confirmHighRisk: true, maxSteps: 0 }, locale: 'zh-CN' } });
     agentSvc.applyToolSettings();
       if (agentSvc.applyRuntimeSettings) agentSvc.applyRuntimeSettings().catch(e => log.warn('[pi] 运行设置同步失败：' + e.message));
     return services.settings.get();
@@ -496,13 +496,10 @@ function registerIpc(ctx) {
     return v;
   });
   h('save-settings', (p) => {
-    if (p && typeof p.sound === 'boolean') {
-      const st = services.stateObj();
-      st.settings.sound = p.sound;
-      services.saveState();
-      windows.broadcast('settings-changed', services.settings.get());
-    }
-    return true;
+    // 老接口（面板的🔇按钮）以前只写 state.json 的 sound，而桌宠读的是 settings.json 的 ——
+    // 于是"点了静音却不静音"。现在统一落到 settings.json 这一份，并且照常广播出去。
+    if (p && typeof p.sound === 'boolean') return applySettings({ sound: p.sound });
+    return services.settings.get();
   });
   // 吃文件长大：一份食物 +10%（规模与上限见 shared/logic.js，屏幕上装不下时由 windows 层封顶）
   h('pet-grow', () => {

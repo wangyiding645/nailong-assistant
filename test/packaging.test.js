@@ -23,15 +23,54 @@ test('打包：数据目录绝不会落在 app.asar 里', () => {
   assert.equal(P.ROOT, ROOT);
 });
 
-test('打包：portable 模式下以 PORTABLE_EXECUTABLE_DIR 为准（否则数据会写进 %TEMP%）', () => {
-  const src = fs.readFileSync(path.join(SRC, 'main', 'paths.js'), 'utf8');
-  const body = src.slice(src.indexOf('function exeDir()'), src.indexOf('function exeDir()') + 600);
+test('打包：portable 用 exe 目录，安装版用 %APPDATA%（覆盖安装不会删掉数据）', () => {
+  const body = fs.readFileSync(path.join(SRC, 'main', 'paths.js'), 'utf8');
   assert.ok(/PORTABLE_EXECUTABLE_DIR/.test(body), 'exeDir() 必须优先看 PORTABLE_EXECUTABLE_DIR');
-  const pick = src.slice(src.indexOf('function pickDataRoot()'), src.indexOf('function pickDataRoot()') + 900);
-  const iExe = pick.indexOf('if (exe) candidates.push(exe)');
-  const iCode = pick.indexOf('if (!PACKAGED) candidates.push(CODE_ROOT)');
-  assert.ok(iExe >= 0 && iCode >= 0 && iExe < iCode, 'exe 目录必须排在源码目录之前');
-  assert.ok(/isWritable/.test(pick), '每个候选目录都要先试写，否则只读目录会直接崩');
+
+  const writable = () => true;
+  const base = { explicit: '', packaged: true, portable: false, devRoot: 'C:\dev', exeDir: 'C:\install', roaming: 'C:\roaming', writable };
+  assert.equal(P.chooseDataRoot(base), 'C:\roaming', '安装版的数据必须在 %APPDATA%，不能放安装目录');
+  assert.equal(P.chooseDataRoot(Object.assign({}, base, { portable: true })), 'C:\install', '免安装版数据在 exe 旁边');
+  assert.equal(P.chooseDataRoot(Object.assign({}, base, { packaged: false })), 'C:\dev', '源码跑保持源码目录，不搬家');
+  assert.equal(P.chooseDataRoot(Object.assign({}, base, { explicit: 'C:\tmp\d' })), 'C:\tmp\d', '显式指定优先');
+  assert.equal(P.chooseDataRoot(Object.assign({}, base, { writable: (d) => d !== 'C:\roaming' })), 'C:\install', '%APPDATA% 不可写时退回老行为');
+});
+
+test('打包：第一次启动会把旧位置（安装目录）里的用户数据搬到新家', () => {
+  const os = require('node:os');
+  const old = fs.mkdtempSync(path.join(os.tmpdir(), 'nailong-old-'));
+  const neu = fs.mkdtempSync(path.join(os.tmpdir(), 'nailong-new-'));
+  try {
+    // 旧位置：装着密钥的设置、历史会话、pi 登录，以及一堆程序文件
+    fs.writeFileSync(path.join(old, 'settings.json'), '{"agentCfg":{"key":"dpapi:user:v1:xxx"}}');
+    fs.writeFileSync(path.join(old, 'reminders.json'), '{}');
+    fs.mkdirSync(path.join(old, '.userdata', 'pi-agent'), { recursive: true });
+    fs.mkdirSync(path.join(old, '.userdata', 'pi-sessions', '--cwd--'), { recursive: true });
+    fs.mkdirSync(path.join(old, 'resources'), { recursive: true });
+    fs.writeFileSync(path.join(old, '.userdata', 'pi-agent', 'auth.json'), '{"p":1}');
+    fs.writeFileSync(path.join(old, '.userdata', 'pi-sessions', '--cwd--', 's.jsonl'), '{}');
+    fs.writeFileSync(path.join(old, 'nailong-assistant.exe'), 'MZ');
+    fs.writeFileSync(path.join(old, 'resources', 'app.asar'), 'x');
+
+    const moved = P.migrateLegacy(neu, old);
+    assert.ok(moved.length >= 4, '至少要搬走设置、提醒、pi 登录和历史会话：' + JSON.stringify(moved));
+    assert.equal(fs.existsSync(path.join(neu, 'settings.json')), true, '密钥所在的 settings.json 必须搬过来');
+    assert.equal(fs.existsSync(path.join(neu, '.userdata', 'pi-agent', 'auth.json')), true, 'pi 的登录要保住');
+    assert.equal(fs.existsSync(path.join(neu, '.userdata', 'pi-sessions', '--cwd--', 's.jsonl')), true, '历史会话要保住');
+    assert.equal(fs.existsSync(path.join(old, 'settings.json')), false, '搬走的东西不留旧副本');
+    // 程序文件不能被当成用户数据搬走
+    assert.equal(fs.existsSync(path.join(neu, 'nailong-assistant.exe')), false);
+    assert.equal(fs.existsSync(path.join(neu, 'resources')), false);
+    // 再跑一次：新家已有就不动，安全
+    fs.writeFileSync(path.join(neu, 'settings.json'), '{"newer":true}');
+    P.migrateLegacy(neu, old);
+    assert.equal(fs.readFileSync(path.join(neu, 'settings.json'), 'utf8'), '{"newer":true}', '已有文件不能被旧数据覆盖');
+    // 同一个目录不算搬家
+    assert.deepEqual(P.migrateLegacy(neu, neu), []);
+  } finally {
+    fs.rmSync(old, { recursive: true, force: true });
+    fs.rmSync(neu, { recursive: true, force: true });
+  }
 });
 
 test('打包：外部进程要用的资源走解包后的真实路径', () => {

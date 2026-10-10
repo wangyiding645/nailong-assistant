@@ -321,33 +321,28 @@ function renderBubble() {
     html = '<div class="bi"><span class="t">⏰</span><span class="x">'
       + (state.alarm.ringing ? I.t('pet.alarmRing') : I.t('pet.alarmAt', { hm: state.alarm.hm })) + '</span></div>';
   } else if (state.hover) {
-    key = 'h:' + state.items.map(T.keyOf).join(';');
-    if (!state.items.length) html = '<div class="bi"><span class="x">' + I.t('pet.noSchedule') + '</span></div>';
+    // 日程与下一个倒数日改成「悬停才看」——不悬停时气泡默认收起来
+    const cd = L.nextCountdowns(state.countdown, null, 1)[0];
+    key = 'h:' + state.items.map(T.keyOf).join(';') + '|' + (cd ? cd.date + cd.text : '');
+    if (!state.items.length && !cd) html = '<div class="bi"><span class="x">' + I.t('pet.noSchedule') + '</span></div>';
     else {
       const max = 6;
       html = state.items.slice(0, max).map((it) => '<div class="bi"><span class="t">' + L.esc(it.time) + '</span><span class="x">' + L.esc(it.text) + '</span></div>').join('');
       if (state.items.length > max) html += '<div class="more">' + I.t('pet.more', { n: state.items.length }) + '</div>';
+      if (cd) {
+        html += '<div class="bi"><span class="t">' + (cd.days === 0 ? I.t('pet.today') : I.t('pet.days', { n: cd.days })) + '</span>'
+          + '<span class="x">' + L.esc(cd.text) + '</span></div>';
+      }
     }
   } else {
-    const cds = L.nextCountdowns(state.countdown, null, 5);
-    const showCd = cds.length > 0 && (state.cycleIdx % 5 === 4 || state.items.length === 0);
+    // 没悬停、没事件、没在计时 —— 奶娃只是奶娃，上面那块默认隐藏。
+    // （以前这里会一直挂着「今天没有日程」或日程/倒数日轮播，登在桌面上很碍眼）
     if (state.mode === 'focus' && state.focus && state.focus.phase !== 'idle') {
       key = 'focus';
       html = '<div class="bi now"><span class="t">🍅</span><span class="x">' + L.esc(state.focus.label) + ' ' + fmtMs(state.focus.remainMs) + '</span></div>';
-    } else if (state.assistantOpen && state.cycleIdx % 3 === 0) {
-      key = 'asst';
-      html = '<div class="bi"><span class="x">' + I.t('pet.assistantIdle') + '</span></div>';
-    } else if (showCd) {
-      const cd = cds[0];
-      key = 'cd:' + cd.date + ':' + cd.text;
-      html = '<div class="bi"><span class="t">' + (cd.days === 0 ? I.t('pet.today') : I.t('pet.days', { n: cd.days })) + '</span><span class="x">' + L.esc(cd.text) + '</span></div>';
-    } else if (state.items.length) {
-      const it = state.items[state.cycleIdx % state.items.length];
-      key = 'c:' + T.keyOf(it);
-      html = '<div class="bi"><span class="t">' + L.esc(it.time) + '</span><span class="x">' + L.esc(it.text) + '</span></div>';
     } else {
-      key = 'empty';
-      html = '<div class="bi"><span class="x">' + I.t('pet.noSchedule') + '</span></div>';
+      hideBubble();
+      return;
     }
   }
 
@@ -463,10 +458,20 @@ function setCountdown(text) {
 }
 function applyTheme(t) { document.body.className = 't' + (Number(t) || 0); }
 
-function hitTest(e) {
-  const el = document.elementFromPoint(e.clientX, e.clientY);
+function hitTest(p) {
+  const el = document.elementFromPoint(p.x, p.y);
   if (!el) return false;
-  return $('pet').contains(el) || $('bubble').contains(el);
+  if ($('pet').contains(el)) return true;
+  // 气泡收起来时不参与 hover 判定 —— 否则鼠标划到那块看不见的空地上，奶蛙也会挥手/弹气泡
+  return bubbleShown() && $('bubble').contains(el);
+}
+
+function bubbleShown() { return $('bubble').classList.contains('show'); }
+
+function hideBubble() {
+  const bubble = $('bubble');
+  if (bubble.className !== '') { bubble.className = ''; bubble.innerHTML = ''; }
+  state.lastBubbleKey = 'idle';
 }
 
 // ---------------------------------------------------------------- 拖动 / 点击
@@ -551,7 +556,7 @@ $('bubble').addEventListener('click', async (e) => {
 });
 
 window.addEventListener('mousemove', (e) => {
-  state.hover = hitTest(e);
+  state.hover = hitTest({ x: e.clientX, y: e.clientY });
   renderBubble();
 });
 window.addEventListener('mouseleave', () => { state.hover = false; renderBubble(); });

@@ -15,7 +15,15 @@
  *   code —— 代码/资源在哪（renderer / native / assets / pi-ext / node_modules）
  *           打包后在 app.asar 里；**外部进程（PowerShell、pi 子进程）读不了 asar**，
  *           所以需要解包的那几项通过 unpacked() 换成 app.asar.unpacked 的真实路径
- *   ROOT —— 用户数据在哪（可写）：环境变量 → portable exe 目录 → exe 目录 → 源码目录 → %APPDATA%
+ *   ROOT —— 用户数据在哪（可写）：
+ *           显式 NAILONG_DATA_DIR → 源码跑用源码目录 → portable 用 exe 目录
+ *           → **安装版用 %APPDATA%\奶蛙助手**
+ *
+ *   3. **安装版的数据不能放安装目录**
+ *      NSIS 覆盖安装会先跑旧版卸载器，卸载器最后一步是 RMDir /r $INSTDIR ——
+ *      放里面的 API 密钥（settings.json）、历史会话（.userdata/pi-sessions）、
+ *      pi 的登录（.userdata/pi-agent）会被一起删掉。所以安装版固定用 %APPDATA%，
+ *      并且第一次启动会把旧位置（安装目录）里的那些东西搬过来。
  */
 
 const fs = require('fs');
@@ -70,20 +78,92 @@ function isWritable(dir) {
   }
 }
 
-function pickDataRoot() {
-  const candidates = [];
-  if (process.env.NAILONG_DATA_DIR) candidates.push(path.resolve(process.env.NAILONG_DATA_DIR));
-  const exe = exeDir();
-  if (exe) candidates.push(exe);
-  if (!PACKAGED) candidates.push(CODE_ROOT);          // 开发时就是源码目录，行为和以前一致
-  candidates.push(path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), '奶蛙助手'));
-  for (const c of candidates) {
-    if (isWritable(c)) return c;
+/** 安装版的数据家：%APPDATA%\奶蛙助手 —— 覆盖安装/卸载都不会碰它 */
+function roamingDir() {
+  return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), '奶蛙助手');
+}
+
+const PORTABLE = !!process.env.PORTABLE_EXECUTABLE_DIR;
+
+/**
+ * 选数据根。逻辑单独拿出来是为了能直接单测（不依赖真的打包环境）。
+ * @param {object} o { explicit, packaged, portable, devRoot, exeDir, roaming, writable }
+ */
+function chooseDataRoot(o) {
+  const writable = o.writable || isWritable;
+  if (o.explicit && writable(o.explicit)) return o.explicit;      // 测试/开发显式指定，听它的
+  if (!o.packaged) {                                              // 源码跑：还是源码目录
+    if (writable(o.devRoot)) return o.devRoot;
+    return o.roaming;
   }
+  if (o.portable && o.exeDir && writable(o.exeDir)) {
+    // 免安装版：数据就在 exe 旁边（README 承诺：整个文件夹拷走就是完整搬家）
+    return o.exeDir;
+  }
+  // 安装版：**不**把数据放安装目录 —— 覆盖安装的卸载器会把那目录整个删掉
+  if (writable(o.roaming)) return o.roaming;
+  if (o.exeDir && writable(o.exeDir)) return o.exeDir;            // %APPDATA% 不可写时退回老行为
   return path.join(os.tmpdir(), 'nailong-assistant');
 }
 
+function pickDataRoot() {
+  return chooseDataRoot({
+    explicit: process.env.NAILONG_DATA_DIR ? path.resolve(process.env.NAILONG_DATA_DIR) : '',
+    packaged: PACKAGED,
+    portable: PORTABLE,
+    devRoot: CODE_ROOT,
+    exeDir: exeDir(),
+    roaming: roamingDir()
+  });
+}
+
+// 从旧位置（安装目录）搬到新家时，只搬用户的东西，不动程序文件
+const LEGACY_FILES = [
+  'schedule.txt', 'countdown.txt', 'state.json', 'agent.json', 'settings.json',
+  'agent-memory.json', 'agent-sessions.json', 'focus.json', 'reminders.json', 'clipboard.json',
+  'pet.cfg', 'widget.cfg', 'popup.cfg'
+];
+// .userdata 里只有这两块是命根子：pi 的登录/模型库，以及历史会话；
+// 剩下的 Electron 缓存（Cache / GPUCache…）没必要搬。
+const LEGACY_DIRS = [path.join('.userdata', 'pi-agent'), path.join('.userdata', 'pi-sessions'), 'backups'];
+
+function moveEntry(from, to) {
+  try {
+    fs.renameSync(from, to);            // 同一个盘就是瞬间事
+    return true;
+  } catch (e) { /* 跟盘不一致 / 目标被占 */ }
+  try {
+    fs.cpSync(from, to, { recursive: true, errorOnExist: false, force: false });
+    fs.rmSync(from, { recursive: true, force: true });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * 一次性搬家：新家还没有的东西，从旧位置（安装目录）搬过来。
+ * 逐个条目判断，已有就不动 —— 所以重复跑安全。
+ * @returns {Array} [{ from, to }] 实际搬了哪些，给启动日志用
+ */
+function migrateLegacy(root, from) {
+  if (!from || path.resolve(from) === path.resolve(root)) return [];
+  const moved = [];
+  const entries = LEGACY_FILES.concat(LEGACY_DIRS);
+  for (const rel of entries) {
+    const src = path.join(from, rel);
+    const dst = path.join(root, rel);
+    try {
+      if (fs.existsSync(dst) || !fs.existsSync(src)) continue;
+    } catch (e) { continue; }
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    if (moveEntry(src, dst)) moved.push({ from: src, to: dst });
+  }
+  return moved;
+}
+
 const ROOT = pickDataRoot();
+const MIGRATED = migrateLegacy(ROOT, exeDir());
 
 /** 代码侧资源（需要外部进程读的走 unpacked） */
 const nativeDir = unpacked(path.join(CODE_ROOT, 'native'));
@@ -95,7 +175,9 @@ const piPkgDir = unpacked(path.join(CODE_ROOT, 'node_modules', '@earendil-works'
 const P = {
   // ---- 数据侧（可写，用户的东西都在这） ----
   ROOT: ROOT,
+  migrated: MIGRATED,        // 这次启动从旧位置搬过来的东西（启动日志会写一条）
   packaged: PACKAGED,
+  portable: PORTABLE,
   cache: path.join(ROOT, '.cache'),
   logs: path.join(ROOT, '.cache', 'logs'),
   userData: path.join(ROOT, '.userdata'),
@@ -140,3 +222,5 @@ const P = {
 };
 
 module.exports = P;
+module.exports.chooseDataRoot = chooseDataRoot;
+module.exports.migrateLegacy = migrateLegacy;

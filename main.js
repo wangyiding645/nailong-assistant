@@ -34,6 +34,10 @@ function boot() {
   const log = createLogger({ dir: P.logs, name: 'app', level: process.env.WIDGET_DEBUG === '1' ? 'debug' : 'info' });
   installCrashHandlers(log);
   log.info('启动，版本 ' + app.getVersion() + '，根目录 ' + P.ROOT);
+  if (P.migrated && P.migrated.length) {
+    log.info('[data] 已从旧位置搬来 ' + P.migrated.length + ' 项用户数据（密钥/历史会话/pi 登录等）：'
+      + P.migrated.map((m) => path.basename(m.to)).join(' '));
+  }
 
   const appState = { mode: 'normal', asstPinned: true, foreground: '' };
   let services = null;

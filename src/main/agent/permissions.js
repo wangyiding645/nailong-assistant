@@ -11,7 +11,7 @@ const DEFAULT_POLICY = {
   allow: {},                    // { toolName: true } 用户勾选「以后都允许」
   deny: {},                     // { toolName: true }
   confirmHighRisk: true,        // 高危工具即使 auto 也要问
-  maxSteps: 24
+  maxSteps: 0                   // 0 = 不限次数（能干多久干多久，随时可停）
 };
 
 // 高危命令黑名单（命中即拒绝，需用户手动改文件或换方式）

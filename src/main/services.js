@@ -19,6 +19,8 @@ const usageLib = require('./agent/usage.js');
 // ------------------------------------------------------------------ 设置
 
 function createSettings() {
+  // 迁移过就立刻落盘：只改内存的话文件里一直留着旧值，下次启动又迁一遍（行为对但很难查）
+  let migrated = false;
   const store = createStore(P.settings, {
     locale: 'zh-CN',
     theme: 0,
@@ -42,14 +44,26 @@ function createSettings() {
       autoRetry: true,
       contextWindow: 128000,
       disabledTools: {},
-      policy: { mode: 'confirm', allow: {}, deny: {}, confirmHighRisk: true, maxSteps: 24 },
+      policy: { mode: 'confirm', allow: {}, deny: {}, confirmHighRisk: true, maxSteps: 0 },
       locale: 'zh-CN',
       autoScreenshotEveryAction: true
     },
     pet: { scale: 1, alwaysOnTop: true, hideOnFullscreen: false },
     privacy: { clipboardHistory: true, clipboardLimit: 200, logLevel: 'info' },
     onboardingDone: false
-  }, { version: 1 });
+  }, {
+    version: 2,
+    // v1 → v2：工具调用次数上限从「默认 24 次」改成 0 = 不限次数。
+    // 老配置里存着 24 的用户如果只改默认值，升级后还是会被拦在第 24 次 —— 所以直接迁到 0。
+    migrate(d) {
+      if (d && d.agent && d.agent.policy && d.agent.policy.maxSteps !== 0) {
+        d.agent.policy.maxSteps = 0;
+        migrated = true;
+      }
+      return d;
+    }
+  });
+  if (migrated) store.saveNow();
 
   return {
     store,
@@ -74,7 +88,7 @@ function createSettings() {
         autoRetry: true,
         contextWindow: 128000,
         disabledTools: {},
-        policy: { mode: 'confirm', allow: {}, deny: {}, confirmHighRisk: true, maxSteps: 24 },
+        policy: { mode: 'confirm', allow: {}, deny: {}, confirmHighRisk: true, maxSteps: 0 },
         locale: 'zh-CN'
       }, store.get('agent', {}));
     }

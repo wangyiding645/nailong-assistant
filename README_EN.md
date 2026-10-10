@@ -12,7 +12,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D4?logo=windows&logoColor=white)](#)
 [![Electron](https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white)](#)
 [![License](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/wangyiding645/nailong-assistant?color=orange)](https://github.com/wangyiding645/nailong-assistant/releases/tag/v3.3.0)
+[![Release](https://img.shields.io/github/v/release/wangyiding645/nailong-assistant?color=orange)](https://github.com/wangyiding645/nailong-assistant/releases/tag/v3.3.1)
 [![Stars](https://img.shields.io/github/stars/wangyiding645/nailong-assistant?style=social)](https://github.com/wangyiding645/nailong-assistant/stargazers)
 
 [简体中文](README.md) · [English](README_EN.md)
@@ -23,13 +23,13 @@
 
 ## Download for Windows
 
-**3.3.0 · 2026-10-10 · Windows x64**
+**3.3.1 · 2026-10-10 · Windows x64**
 
-- [Installer](https://github.com/wangyiding645/nailong-assistant/releases/download/v3.3.0/nailong-assistant-3.3.0-win-x64.exe).
-- [Portable](https://github.com/wangyiding645/nailong-assistant/releases/download/v3.3.0/nailong-assistant-3.3.0-win-x64-portable.exe): run from a writable directory; no separate Node.js or pi installation is needed.
-- [Release notes and SHA-256 checksums](https://github.com/wangyiding645/nailong-assistant/releases/tag/v3.3.0).
+- [Installer](https://github.com/wangyiding645/nailong-assistant/releases/download/v3.3.1/nailong-assistant-3.3.1-win-x64.exe).
+- [Portable](https://github.com/wangyiding645/nailong-assistant/releases/download/v3.3.1/nailong-assistant-3.3.1-win-x64-portable.exe): run from a writable directory; no separate Node.js or pi installation is needed.
+- [Release notes and SHA-256 checksums](https://github.com/wangyiding645/nailong-assistant/releases/tag/v3.3.1).
 
-This release: the frog grows 10% each time it eats a file you drop on it (Settings → Appearance has a 50%–999% size slider), and a bug that silently wiped alarms/timers whenever you switched mode (so they never rang or laughed) is fixed. See the [changelog](CHANGELOG.md).
+This release: **your data survives reinstalling** (installed builds now keep data in `%APPDATA%\奶蛙助手`, so credentials and history are kept across upgrades and uninstalls); tool calls have **no step limit** anymore; history sessions open reliably; the pet's speech bubble is hidden by default (it appears on hover, reminders and timers). See the [changelog](CHANGELOG.md).
 
 These binaries are published in this repository's Release. Exit the old app before upgrading and preserve `agent.json`, `settings.json`, `.userdata` and other personal data beside it. Use the same Windows account to read encrypted credentials.
 
@@ -166,8 +166,8 @@ Drop files on the frog → if the icon is on your desktop, **it runs over to the
 
 | File | How to use |
 | --- | --- |
-| `nailong-assistant-3.3.0-win-x64-portable.exe` (133MB) | **No install.** Double-click and it runs. Your data (schedule, settings, conversations) is written **next to the exe**, so copying the folder moves everything. |
-| `nailong-assistant-3.3.0-win-x64.exe` (133MB) | Installer wizard; creates shortcuts and does **not** delete your data on uninstall. |
+| `nailong-assistant-3.3.1-win-x64-portable.exe` (133MB) | **No install.** Double-click and it runs. Your data (schedule, settings, conversations) is written **next to the exe**, so copying the folder moves everything. |
+| `nailong-assistant-3.3.1-win-x64.exe` (133MB) | Installer wizard; creates shortcuts and does **not** delete your data on uninstall. |
 
 Both are complete builds with the bundled pi kernel — no Node, no pre-installed pi.
 First run creates `schedule.txt`, `settings.json` and `.userdata/` next to the app, all plain text

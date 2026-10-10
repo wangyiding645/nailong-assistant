@@ -380,13 +380,20 @@ function tick() {
   $('date').textContent = d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 · ' + L.weekdayCn(d);
 }
 
+/** 音效开关只认 settings.json 那一份；state.json 里的是 v2 遗留，仅作兜底 */
+function soundOf(d) {
+  if (d && d.settings && typeof d.settings.sound === 'boolean') return d.settings.sound;
+  if (d && d.state && d.state.settings && typeof d.state.settings.sound === 'boolean') return d.state.settings.sound;
+  return true;
+}
+
 async function reload() {
   const d = await api.appInit();
   state.tasks = T.parseTasks(d.tasks || '');
   state.countdown = L.parseCountdown(d.countdown || '');
   state.done = (d.state && d.state.done) || {};
   state.completedDays = (d.state && d.state.completedDays) || [];
-  state.settings = (d.state && d.state.settings) || { sound: true };
+  state.settings = { sound: soundOf(d) };
   state.streak = 0;
   renderList();
   renderProgress();
@@ -406,7 +413,7 @@ window.addEventListener('unhandledrejection', (e) => console.error('REJ ' + ((e.
   state.countdown = L.parseCountdown(d.countdown || '');
   state.done = d.state.done || {};
   state.completedDays = d.state.completedDays || [];
-  state.settings = d.state.settings || { sound: true };
+  state.settings = { sound: soundOf(d) };
   applyTheme(d.theme);
   const now = new Date();
   state.calY = now.getFullYear();
@@ -453,7 +460,9 @@ window.addEventListener('unhandledrejection', (e) => console.error('REJ ' + ((e.
   $('soundbtn').onclick = async () => {
     state.settings.sound = !state.settings.sound;
     renderSound();
-    await api.saveSettings({ sound: state.settings.sound });
+    const saved = await api.settingsSave({ sound: state.settings.sound });
+    state.settings.sound = !!(saved && typeof saved.sound === 'boolean' ? saved.sound : state.settings.sound);
+    renderSound();
   };
   $('close').onclick = () => api.hidePopup();
   $('avatar').onclick = () => api.resetPanelPos();
@@ -465,6 +474,8 @@ window.addEventListener('unhandledrejection', (e) => console.error('REJ ' + ((e.
     }
   });
 
+  // 里外只认一份设置：设置窗或别处改了音效，面板的图标也跟着走
+  api.onSettingsChanged((s) => { if (s && typeof s.sound === 'boolean') { state.settings.sound = s.sound; renderSound(); } });
   api.onTasksChanged((text) => { state.tasks = T.parseTasks(text || ''); renderList(); renderProgress(); if (state.view === 'cal') renderCal(); });
   api.onThemeChanged((t) => { applyTheme(t); api.refreshPanelBackdrop(); });
   api.onCountdownChanged((text) => { state.countdown = L.parseCountdown(text || ''); renderCdStrip(); if (state.view === 'cal') renderCal(); });

@@ -93,7 +93,9 @@ function createBridge(deps) {
 
   async function runTool(name, args) {
     const policyAtStart = deps.getPolicy ? deps.getPolicy() : {};
-    if (usedSteps >= (policyAtStart.maxSteps || 24)) return limit('已达到任务工具调用上限，请开始新任务');
+    // maxSteps = 0（默认）表示不限次数：能干多久干多久，由用户随时点停止；设了正数才拦。
+    const cap = Number(policyAtStart.maxSteps) || 0;
+    if (cap > 0 && usedSteps >= cap) return limit('已达到任务工具调用上限，请开始新任务');
     usedSteps++;
     const generation = cancellation;
     const spec = toolset.get(name);

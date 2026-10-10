@@ -13,6 +13,8 @@
  *   - 图片按 data URL 还原，能直接 <img src>
  */
 
+const fs = require('fs');
+
 function toText(content) {
   if (typeof content === 'string') return content;
   if (!Array.isArray(content)) return '';
@@ -142,4 +144,54 @@ function piStatsToUsage(stats) {
   };
 }
 
-module.exports = { piMessagesToTranscript, piStatsToUsage, toText, toImages };
+module.exports = { piMessagesToTranscript, piStatsToUsage, toText, toImages, readSessionCwd, repairSessionCwd };
+
+/**
+ * 读会话文件头（第一行）里记的工作目录。
+ * pi 把会话建在哪个目录就记哪个，切换会话时会用它当 cwd。
+ */
+function readSessionCwd(file) {
+  try {
+    const text = fs.readFileSync(file, 'utf8');
+    const nl = text.indexOf('\n');
+    const rec = JSON.parse(nl < 0 ? text : text.slice(0, nl));
+    return rec && typeof rec.cwd === 'string' ? rec.cwd : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * 把会话头里的工作目录改成 cwd，只改第一行那个字段，其余原样保留。
+ *
+ * pi 自己的交互式界面遇到「会话记的目录不存在」会问一句「用当前工作目录继续吗」，
+ * 确认后用 cwdOverride 打开；RPC 模式没这个兜底，直接抛 MissingSessionCwdError，
+ * 于是历史会话就点不开了。我们按它那套语义把目录改成当前的，并留一份 .bak-cwd。
+ *
+ * @returns {boolean} 是否真的改了（目录相同、文件不合法、写盘失败都返回 false）
+ */
+function repairSessionCwd(file, cwd) {
+  if (!cwd) return false;
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch (e) { return false; }
+  const nl = text.indexOf('\n');
+  const head = nl < 0 ? text : text.slice(0, nl);
+  let rec = null;
+  try { rec = JSON.parse(head); } catch (e) { return false; }
+  if (!rec || rec.type !== 'session' || rec.cwd === cwd) return false;
+  rec.cwd = cwd;
+  const rest = nl < 0 ? '' : text.slice(nl);
+  // 先留备份再改：万一中途挂了，原文件还在
+  try {
+    if (!fs.existsSync(file + '.bak-cwd')) fs.writeFileSync(file + '.bak-cwd', text, 'utf8');
+  } catch (e) { /* 备份失败不影响修复本身 */ }
+  const tmp = file + '.tmp' + process.pid;
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(rec) + rest, 'utf8');
+    fs.renameSync(tmp, file);
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch (e2) { /* ignore */ }
+    return false;
+  }
+  return true;
+}

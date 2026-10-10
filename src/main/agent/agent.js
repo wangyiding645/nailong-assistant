@@ -262,7 +262,8 @@ function createAgent(deps) {
     if (state.running) return { error: '上一个任务还在跑，先停止它' };
     const cfg = deps.getConfig() || {};
     const pol = policy();
-    const maxSteps = (opts && opts.maxSteps) || pol.maxSteps || 24;
+    // 0 = 不限次数（默认）：只有用户显式设了正数才封顶
+    const maxSteps = Number((opts && opts.maxSteps) || pol.maxSteps) || 0;
 
     state.running = true;
     state.abort = false;
@@ -276,7 +277,7 @@ function createAgent(deps) {
     let finalText = '';
 
     try {
-      for (let i = 0; i < maxSteps; i++) {
+      for (let i = 0; maxSteps === 0 || i < maxSteps; i++) {
         if (state.abort) { emit({ type: 'done', stopped: true }); return { stopped: true }; }
         const trimmed = promptLib.trimHistory(state.messages, cfg.historyChars || 160000);
         emit({ type: 'status', text: steps === 0 ? '思考中…' : '第 ' + steps + ' 步…' });
@@ -295,7 +296,7 @@ function createAgent(deps) {
           const images = [];
           for (const call of msg.toolCalls) {
             if (state.abort) break;
-            if (steps >= maxSteps) { emit({ type: 'error', message: '任务工具调用已达到上限' }); return { error: 'task-limit' }; }
+            if (maxSteps > 0 && steps >= maxSteps) { emit({ type: 'error', message: '任务工具调用已达到上限' }); return { error: 'task-limit' }; }
             steps++;
             const r = await executeTool(call);
             state.messages.push({ role: 'tool', tool_call_id: call.id, name: call.name, content: r.text });

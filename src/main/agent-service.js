@@ -128,7 +128,7 @@ function createAgentService(deps) {
 
   function policy() {
     const a = services.settings.agentCfg();
-    const p = Object.assign({ mode: 'confirm', allow: {}, deny: {}, confirmHighRisk: true, maxSteps: 24 }, a.policy || {});
+    const p = Object.assign({ mode: 'confirm', allow: {}, deny: {}, confirmHighRisk: true, maxSteps: 0 }, a.policy || {});
     delete p.maxRuntimeMs; // 兼容旧设置；任务不再设总时长上限。
     p.selfRoot = P.ROOT;
     p.planMode = !!a.planMode;

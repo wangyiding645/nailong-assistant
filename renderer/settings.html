@@ -273,7 +273,7 @@
                 <option value="readonly">只读（只能看，不能动）</option>
               </select>
             </div>
-            <div class="fld"><label>单个任务最多调用多少次工具</label><input id="maxSteps" type="number" min="3" max="80"></div>
+            <div class="fld"><label>工具调用次数上限（0 = 不限）</label><input id="maxSteps" type="number" min="0" max="100000"></div>
             <p class="lead" id="taskDurationHint">任务不设总时长上限，可随时在助手中点击停止。</p>
             <div class="switch" style="max-width:520px">
               <div class="track" id="sw-high"><i></i></div>

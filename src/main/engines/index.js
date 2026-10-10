@@ -16,7 +16,7 @@ const { execFile } = require('child_process');
 const P = require('../paths.js');
 const { createBridge } = require('./bridge.js');
 const { createPiEngine } = require('./pi.js');
-const { piMessagesToTranscript, piStatsToUsage } = require('./pi-history.js');
+const { piMessagesToTranscript, piStatsToUsage, readSessionCwd, repairSessionCwd } = require('./pi-history.js');
 const preflightLib = require('./pi-preflight.js');
 const agentDirLib = require('./pi-agent-dir.js');
 const mcpLib = require('./mcp.js');
@@ -155,12 +155,18 @@ function createEngineRouter(deps) {
     }
   }
 
+  /** 助手当前的工作目录：设置里指定的工作区，没设就用数据根 */
+  function agentCwd() {
+    const a = settings.agentCfg();
+    return a.workspace || P.ROOT;
+  }
+
   /** pi 的启动参数由设置决定；改了设置就重启子进程让它生效 */
   function piStartOpts() {
     const a = settings.agentCfg();
     const opts = {
       sessionDir: sessionDir,
-      cwd: a.workspace || P.ROOT,
+      cwd: agentCwd(),
       sessionFile: pi.state.sessionFile || '',
       thinking: a.thinking || 'off',
       loadUserExtensions: !!a.loadUserExtensions,
@@ -616,9 +622,14 @@ function createEngineRouter(deps) {
     listSessions() {
       if (activeEngine() === 'pi') {
         const list = listPiSessions().map((s) => ({
-          id: s.file, title: s.title, createdAt: s.createdAt, updatedAt: s.updatedAt, count: s.count
+          id: s.file, file: s.file, sessionId: s.id, title: s.title,
+          createdAt: s.createdAt, updatedAt: s.updatedAt, count: s.count
         }));
-        return { list: list, current: pi.sessionId ? (list.find((x) => x.id === pi.sessionId) || {}).id || null : null, engine: 'pi' };
+        // 当前会话按文件路径比。以前拿文件路径去比 pi 的 sessionId，永远不相等，
+        // 于是历史列表里标不出「你现在在这条」。
+        const cur = String(pi.state.sessionFile || '');
+        const hit = cur ? list.find((x) => path.resolve(x.file) === path.resolve(cur)) : null;
+        return { list: list, current: hit ? hit.id : null, engine: 'pi' };
       }
       return Object.assign(builtin.listSessions(), { engine: 'builtin' });
     },
@@ -632,12 +643,30 @@ function createEngineRouter(deps) {
     async loadSession(id) {
       if (activeEngine() === 'pi') {
         await piUp();
-        const r = await pi.command('switch_session', { sessionPath: String(id || '') }, 20000);
+        const target = String(id || '');
+        const switchTo = async () => pi.command('switch_session', { sessionPath: target }, 20000);
+        let r = null;
+        let repaired = null;
+        try {
+          r = await switchTo();
+        } catch (e) {
+          // 会话记的工作目录被删了（换过盘、搬过文件夹、覆盖安装换了数据根）。
+          // pi 自己的交互式界面这时会问一句「用当前工作目录继续吗」，RPC 模式没有这个兜底，
+          // 只会抛 MissingSessionCwdError，于是历史会话永远点不开 —— 我们按同一套语义改目录再试一次。
+          const msg = String((e && e.message) || '');
+          if (!/working directory does not exist|MissingSessionCwd/i.test(msg)) throw e;
+          const from = readSessionCwd(target);
+          const to = agentCwd();
+          if (!repairSessionCwd(target, to)) throw e;
+          log.warn('[pi] 会话工作目录已失效，改用当前目录打开：' + from + ' → ' + to);
+          repaired = { from: from, to: to };
+          r = await switchTo();
+        }
         if (r && r.cancelled) return null;
         await pi.status();
-        const meta = fileMeta(String(id));
+        const meta = fileMeta(target);
         const transcript = piMessagesToTranscript(await pi.messages());
-        return { id: id, title: meta.title, messages: [], transcript: transcript };
+        return { id: target, title: meta.title, messages: [], transcript: transcript, repaired: repaired };
       }
       return builtin.loadSession(id);
     },

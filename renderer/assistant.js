@@ -585,10 +585,10 @@ async function renderSessions() {
   const list = (d && d.list) || [];
   const cur = d && d.current;
   $('sessList').innerHTML = list.length
-    ? list.map((s) => '<div class="sess' + (s.id === cur ? ' cur' : '') + '" data-id="' + s.id + '">'
+    ? list.map((s) => '<div class="sess' + (s.id === cur ? ' cur' : '') + '" data-id="' + esc(s.id) + '">'
       + '<span class="ttl">' + esc(s.title || '新对话') + '</span>'
       + '<span class="tm">' + new Date(s.updatedAt).toLocaleDateString('zh-CN') + ' · ' + (s.count || 0) + ' 条</span>'
-      + '<span class="x" data-del="' + s.id + '">✕</span></div>').join('')
+      + '<span class="x" data-del="' + esc(s.id) + '">✕</span></div>').join('')
     : '<div class="empty">还没有历史会话</div>';
   Array.prototype.forEach.call($('sessList').querySelectorAll('.sess'), (el) => {
     el.onclick = async (e) => {
@@ -600,15 +600,23 @@ async function renderSessions() {
         return;
       }
       const r = await api.agentSessionLoad({ id: el.getAttribute('data-id') });
-      if (r && r.ok) {
-        $('msgs').innerHTML = '';
-        flushStreamState();
-        replay(r.session.transcript || openAiHistoryToTranscript(r.session.messages));
+      if (!r || !r.ok) {
+        // 以前这里失败是什么都不做 —— 用户只看到“点开没反应”。现在把面板关掉、把原因写进对话区（
+        // 不关的话提示会被历史面板盖住，等于白说）
         $('sessPanel').className = '';
-        setPending(null);
-        refreshPills();
-        if (!(r.session.transcript || []).length) addMsg('sys', '这个会话还没对话记录');
+        addMsg('err', '打不开这条会话：' + String((r && r.error) || '未知原因'));
+        return;
       }
+      $('msgs').innerHTML = '';
+      flushStreamState();
+      replay(r.session.transcript || openAiHistoryToTranscript(r.session.messages));
+      $('sessPanel').className = '';
+      setPending(null);
+      refreshPills();
+      if (r.session.repaired) {
+        addMsg('sys', '这条会话原来的工作目录 ' + r.session.repaired.from + ' 已不存在，已改用 ' + r.session.repaired.to + ' 打开（原文件备份为 .bak-cwd）');
+      }
+      if (!(r.session.transcript || []).length) addMsg('sys', '这个会话还没对话记录');
     };
   });
 }

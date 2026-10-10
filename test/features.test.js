@@ -287,3 +287,16 @@ test('番茄钟：focus-start 必须返回 status 形状，而不是内部 state
   const tool = fs.readFileSync(path.join(ROOT, 'renderer', 'tool.js'), 'utf8');
   assert.ok(/PHASE_BY_ID\[st\.phase\]/.test(tool), '界面要能按 phase 字段兜底判断阶段');
 });
+
+test('音效开关只有一份：面板按钮和桌宠读的是同一个 settings.sound', () => {
+  const popup = fs.readFileSync(path.join(ROOT, 'renderer', 'popup.js'), 'utf8');
+  assert.ok(/function soundOf\(d\)/.test(popup), '面板要有统一的取值函数');
+  assert.ok(/d\.settings && typeof d\.settings\.sound === 'boolean'/.test(popup), '面板必须优先读 settings.json 的 sound');
+  assert.ok(/api\.settingsSave\(\{ sound/.test(popup), '面板要写 settings.json 这一份');
+  assert.ok(/onSettingsChanged\(\(s\) => \{ if \(s && typeof s\.sound === 'boolean'\)/.test(popup), '别处改了音效，面板图标要跟着走');
+  const ipc = fs.readFileSync(path.join(SRC, 'main', 'ipc.js'), 'utf8');
+  const at = ipc.indexOf("h('save-settings'");
+  const body = ipc.slice(at, at + 420);
+  assert.ok(/applySettings\(\{ sound/.test(body), '老接口也要落到同一份设置上');
+  assert.ok(!/st\.settings\.sound\s*=/.test(body), '不能再往 state.json 里存第二份 sound');
+});
