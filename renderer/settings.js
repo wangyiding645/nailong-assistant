@@ -452,9 +452,12 @@ async function initPerm(isFirst) {
   SET = s;
   $('policyMode').value = (s.agent && s.agent.policy && s.agent.policy.mode) || 'confirm';
   num('maxSteps', (s.agent && s.agent.policy && s.agent.policy.maxSteps) || 0);
-  sw('sw-high', true, async () => {});
-  $('sw-high').onclick = null;
-  $('sw-high').setAttribute('aria-disabled', 'true');
+  // 这个开关以前是假的（写死 true 且点不动），于是「自动执行」永远被高危确认拦住
+  sw('sw-high', (s.agent && s.agent.policy && s.agent.policy.confirmHighRisk) === true, async (v) => {
+    const pol = Object.assign({}, SET.agent.policy, { confirmHighRisk: v });
+    await saveSettings({ agent: Object.assign({}, SET.agent, { policy: pol }) });
+    toast(v ? '高危操作（跑命令/删文件/锁屏）会先问你' : '高危操作也会直接做；危险命令与受保护路径仍然会被拒绝');
+  });
   $('policyMode').onchange = async () => {
     const pol = Object.assign({}, SET.agent.policy, { mode: $('policyMode').value });
     await saveSettings({ agent: Object.assign({}, SET.agent, { policy: pol }) });

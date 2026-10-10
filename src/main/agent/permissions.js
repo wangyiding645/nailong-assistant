@@ -10,7 +10,11 @@ const DEFAULT_POLICY = {
   mode: 'confirm',              // confirm | auto | readonly
   allow: {},                    // { toolName: true } 用户勾选「以后都允许」
   deny: {},                     // { toolName: true }
-  confirmHighRisk: true,        // 高危工具即使 auto 也要问
+  // 自动执行模式下，高危工具是否还要先问。新装默认 true（先问一句更安全）；
+  // 老配置由 settings 的 v2→v3 迁移改成 false —— 那个开关以前是写死的、点不动的，
+  // 于是「自动执行」根本没生效。设置 → 权限里随时能开关它。
+  // 危险命令与受保护路径无论这里怎么设都直接拒绝。
+  confirmHighRisk: true,
   maxSteps: 0                   // 0 = 不限次数（能干多久干多久，随时可停）
 };
 
@@ -103,7 +107,9 @@ function evaluate(tool, args, policy) {
     const targets = args ? [args.path, args.from, args.to].filter(Boolean) : [];
     for (const target of targets) {
       const r = inspectPath(target, p.selfRoot ? [p.selfRoot] : []);
-      if (r.risk === 'blocked') return { decision: 'deny', reason: '受保护路径：' + r.why };
+      // normal 以外都拒：以前只拦 blocked（程序自己的目录），于是系统/受保护路径（Windows、
+      // Program Files、AppData、盘符根、用户主目录）在自动执行模式下是一路放行的 —— 和安全文案不符。
+      if (r.risk && r.risk !== 'normal') return { decision: 'deny', reason: '受保护路径：' + r.why };
     }
   }
 
@@ -111,7 +117,12 @@ function evaluate(tool, args, policy) {
     if (tool.level === 'low') return { decision: 'allow', reason: '' };
     return { decision: 'deny', reason: '当前是「只读」模式，只能看不能动' };
   }
-  if (tool.level === 'high') return { decision: 'ask', reason: '高危操作' };
+  if (tool.level === 'high') {
+    // 自动执行 + 没勾「高危也要问」→ 高危工具也直接做（否则 agent 干不了活：跑命令/删文件/锁屏都在这档）
+    if (p.mode === 'auto' && !p.confirmHighRisk) return { decision: 'allow', reason: '' };
+    // 白名单不能绕过高危确认（安全回归里有专门一条）；要它不问，就关掉设置里的「高危也要问」
+    return { decision: 'ask', reason: '高危操作' };
+  }
   if (p.allow && p.allow[name]) return { decision: 'allow', reason: '已加入白名单' };
   if (tool.level === 'low') return { decision: 'allow', reason: '' };
   if (p.mode === 'auto') return { decision: 'allow', reason: '' };

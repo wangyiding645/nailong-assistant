@@ -595,6 +595,9 @@ async function renderSessions() {
       const del = e.target.getAttribute && e.target.getAttribute('data-del');
       if (del) {
         e.stopPropagation();
+        // 会话文件是直接 unlink 掉的（没有回收站、没有撤回），而 ✕ 是鼠标划上去就出现、
+        // 手一抖就删掉一整条对话 —— 所以必须问一句。
+        if (!window.confirm('删掉这条历史会话？删了就找不回来了。')) return;
         await api.agentSessionDelete({ id: del });
         await renderSessions();
         return;

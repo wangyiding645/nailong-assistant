@@ -10,7 +10,7 @@
 [![Electron](https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white)](#)
 [![pi](https://img.shields.io/badge/内核-pi%201.1-6E56CF)](#-双内核pi-当大脑)
 [![License](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.3.1-orange)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.3.2-orange)](CHANGELOG.md)
 
 [简体中文](README.md) · [English](README_EN.md) · [架构](docs/ARCHITECTURE.md) · [安全](docs/SECURITY.md) · [更新日志](CHANGELOG.md)
 
@@ -20,14 +20,15 @@
 
 ## 下载 Windows 最新版
 
-**3.3.1 · 2026-10-10 · Windows x64**
+**3.3.2 · 2026-10-10 · Windows x64**
 
-- [安装版](https://github.com/wangyiding645/nailong-assistant/releases/download/v3.3.1/nailong-assistant-3.3.1-win-x64.exe)：安装向导。
-- [免安装版](https://github.com/wangyiding645/nailong-assistant/releases/download/v3.3.1/nailong-assistant-3.3.1-win-x64-portable.exe)：放到可写目录后直接运行，无需另装 Node.js 或 pi。
-- [发布说明与校验文件](https://github.com/wangyiding645/nailong-assistant/releases/tag/v3.3.1)。
+- [安装版](https://github.com/wangyiding645/nailong-assistant/releases/download/v3.3.2/nailong-assistant-3.3.2-win-x64.exe)：安装向导。
+- [免安装版](https://github.com/wangyiding645/nailong-assistant/releases/download/v3.3.2/nailong-assistant-3.3.2-win-x64-portable.exe)：放到可写目录后直接运行，无需另装 Node.js 或 pi。
+- [发布说明与校验文件](https://github.com/wangyiding645/nailong-assistant/releases/tag/v3.3.2)。
 
-这一版：**数据不再被覆盖安装清掉**（安装版数据移到 `%APPDATA%\奶蛙助手`，卸载/覆盖都不丢，密钥与历史会话会随升级保留）；
-工具调用**不再有次数上限**；历史会话点得开；桌宠气泡默认隐藏（悬停、提醒、计时才出现）。详见 [更新日志](CHANGELOG.md)。
+这一版：**历史会话真的点得开了**（根因是 IPC 处理器漏了 `await`），
+**「自动执行」真的自动了**（那个「高危也要问」开关以前是假的、点不动），
+另外会话删除现在要确认。上一版的改动（数据不再被覆盖安装清掉、工具调用不限次数、气泡默认隐藏）也都在。详见 [更新日志](CHANGELOG.md)。
 
 安装包发布在本仓库的 Release。升级前退出旧版，并保留原程序旁的 `agent.json`、`settings.json`、`.userdata` 等个人数据；使用同一个 Windows 账户读取加密密钥。
 
@@ -179,8 +180,8 @@ Apple Liquid Glass 风格：真实壁纸模糊采样 + 左上高光 + 1px 边缘
 
 | 文件 | 怎么用 |
 | --- | --- |
-| `nailong-assistant-3.3.1-win-x64-portable.exe`（133MB） | **免安装**：双击就跑。你的数据（日程、设置、对话记录）会存在**这个 exe 旁边**，整个文件夹拷走就是完整搬庄 |
-| `nailong-assistant-3.3.1-win-x64.exe`（133MB） | 安装向导：自动建快捷方式，卸载时**不会删你的数据** |
+| `nailong-assistant-3.3.2-win-x64-portable.exe`（133MB） | **免安装**：双击就跑。你的数据（日程、设置、对话记录）会存在**这个 exe 旁边**，整个文件夹拷走就是完整搬庄 |
+| `nailong-assistant-3.3.2-win-x64.exe`（133MB） | 安装向导：自动建快捷方式，卸载时**不会删你的数据** |
 
 两个都是自带 pi 内核的完整版，不需要你先装 pi、也不需要 Node。
 第一次运行会在旁边生成 `schedule.txt` / `settings.json` / `.userdata/`，都是可直接手改的纯文本。

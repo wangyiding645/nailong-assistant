@@ -70,10 +70,40 @@ test('老配置里存的 24 次上限会迁移成 0 = 不限次数', () => {
     // 迁移必须落盘：只改内存的话文件里一直是旧值，每次启动都重迁一遍
     const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'settings.json'), 'utf8'));
     assert.equal(onDisk.agent.policy.maxSteps, 0, '文件里也要是 0');
-    assert.equal(onDisk.__v, 2, '版本号要落到盘上');
+    assert.equal(onDisk.__v, 3, '版本号要落到盘上');
+    assert.equal(onDisk.agent.policy.confirmHighRisk, false, '那个写死的「高危也要问」也要迁掉，否则自动执行照旧每步问');
     svc.dispose();
   } finally {
     if (old === undefined) delete process.env.NAILONG_DATA_DIR; else process.env.NAILONG_DATA_DIR = old;
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('pi 工具桥：自动执行模式下高危工具不再弹确认（agent 要能自己干活）', async () => {
+  const asked = [];
+  const tool = { name: 'run_command', level: 'high', run: async () => ({ text: 'ran' }) };
+  const bridge = createBridge({ toolset: { all: [tool], get: () => tool }, log: { warn() {} }, getPolicy: () => ({ mode: 'auto', confirmHighRisk: false }), askUser: async () => { asked.push(1); return 'exec'; } });
+  bridge.resetTask(false);
+  assert.equal((await bridge.runTool('run_command', { command: 'dir' })).ok, true);
+  assert.equal(asked.length, 0, '自动执行不该再问');
+});
+
+test('pi 工具桥：勾了「高危也要问」时仍然弹一次确认', async () => {
+  const asked = [];
+  const tool = { name: 'lock_screen', level: 'high', run: async () => ({ text: 'ran' }) };
+  const bridge = createBridge({ toolset: { all: [tool], get: () => tool }, log: { warn() {} }, getPolicy: () => ({ mode: 'auto', confirmHighRisk: true }), askUser: async () => { asked.push(1); return 'exec'; } });
+  bridge.resetTask(false);
+  assert.equal((await bridge.runTool('lock_screen', {})).ok, true);
+  assert.equal(asked.length, 1);
+});
+
+test('pi 工具桥：自动执行下危险命令照样被拦，不会跑去问用户', async () => {
+  const asked = [];
+  const tool = { name: 'run_command', level: 'high', run: async () => ({ text: 'ran' }) };
+  const bridge = createBridge({ toolset: { all: [tool], get: () => tool }, log: { warn() {} }, getPolicy: () => ({ mode: 'auto', confirmHighRisk: false }), askUser: async () => { asked.push(1); return 'exec'; } });
+  bridge.resetTask(false);
+  const r = await bridge.runTool('run_command', { command: 'format c: /q' });
+  assert.equal(r.ok, false);
+  assert.match(r.text, /拦下/);
+  assert.equal(asked.length, 0);
 });

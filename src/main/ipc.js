@@ -185,9 +185,12 @@ function registerIpc(ctx) {
   h('agent-clear', () => agentSvc.clear());
   h('agent-sessions', () => agentSvc.listSessions());
   h('agent-session-new', () => agentSvc.newSession());
-  h('agent-session-load', (p) => {
-    const s = agentSvc.loadSession(String((p && p.id) || ''));
-    return s ? { ok: true, session: s } : { ok: false, error: '找不到这个会话' };
+  h('agent-session-load', async (p) => {
+    // 这里必须 await：loadSession 在 pi 引擎下是 async 的，不 await 就会把 Promise 塞进返回对象，
+    // Electron 克隆不了 Promise → 整个 invoke 直接 reject（“An object could not be cloned”），
+    // 界面只能干看着 —— 这就是“历史会话点不进去”的真正原因。
+    const s = await agentSvc.loadSession(String((p && p.id) || ''));
+    return s ? { ok: true, session: s } : { ok: false, error: '找不到这条会话' };
   });
   h('agent-session-delete', (p) => agentSvc.deleteSession(String((p && p.id) || '')));
   h('agent-usage', () => agentSvc.usageDetail());

@@ -52,13 +52,17 @@ function createSettings() {
     privacy: { clipboardHistory: true, clipboardLimit: 200, logLevel: 'info' },
     onboardingDone: false
   }, {
-    version: 2,
+    version: 3,
     // v1 → v2：工具调用次数上限从「默认 24 次」改成 0 = 不限次数。
-    // 老配置里存着 24 的用户如果只改默认值，升级后还是会被拦在第 24 次 —— 所以直接迁到 0。
+    //          老配置里存着 24 的用户如果只改默认值，升级后还是会被拦在第 24 次 —— 所以直接迁到 0。
+    // v2 → v3：「高危操作始终单独确认」以前是写死的（开关是假的、点不动），自动执行模式形同虚设，
+    //          而跑命令/删文件/锁屏正好都是高危 —— 于是 agent 根本干不了活。现在默认不强制确认，
+    //          开关也能真的关了；危险命令与受保护路径仍然直接拒绝。
     migrate(d) {
-      if (d && d.agent && d.agent.policy && d.agent.policy.maxSteps !== 0) {
-        d.agent.policy.maxSteps = 0;
-        migrated = true;
+      const pol = d && d.agent && d.agent.policy;
+      if (pol) {
+        if (pol.maxSteps !== 0) { pol.maxSteps = 0; migrated = true; }
+        if (pol.confirmHighRisk !== false) { pol.confirmHighRisk = false; migrated = true; }
       }
       return d;
     }

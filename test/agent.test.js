@@ -141,7 +141,9 @@ test('permissions: 分级决策', () => {
   assert.equal(perms.evaluate(low, {}, { mode: 'confirm' }).decision, 'allow', '只读工具不该每次都问');
   assert.equal(perms.evaluate(mid, {}, { mode: 'confirm' }).decision, 'ask');
   assert.equal(perms.evaluate(mid, {}, { mode: 'auto' }).decision, 'allow');
-  assert.equal(perms.evaluate(high, { command: 'dir' }, { mode: 'auto' }).decision, 'ask', '高危永远要问');
+  assert.equal(perms.evaluate(high, { command: 'dir' }, { mode: 'auto', confirmHighRisk: false }).decision, 'allow', '自动执行 + 关掉「高危也要问」→ 高危也直接做，否则 agent 干不了活');
+  assert.equal(perms.evaluate(high, { command: 'dir' }, { mode: 'auto', confirmHighRisk: true }).decision, 'ask', '勾了「高危也要问」就仍然要问');
+  assert.equal(perms.evaluate(high, { command: 'dir' }, { mode: 'confirm' }).decision, 'ask', '每步确认模式下高危要问');
   assert.equal(perms.evaluate(mid, {}, { mode: 'readonly' }).decision, 'deny');
   assert.equal(perms.evaluate(mid, {}, { mode: 'confirm', allow: { click: true } }).decision, 'allow');
   assert.equal(perms.evaluate(mid, {}, { mode: 'confirm', deny: { click: true } }).decision, 'deny');
